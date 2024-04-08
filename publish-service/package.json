@@ -1,0 +1,25 @@
+{
+  "name": "accesss3zip-poc3",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/aws-lambda": "^8.10.136",
+    "@types/node": "^20.11.30",
+    "@types/unzipper": "^0.10.9",
+    "@types/xml2js": "^0.4.14",
+    "typescript": "^5.4.3"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.12",
+    "aws-sdk": "^2.1585.0",
+    "unzipper": "^0.10.14"
+  }
+}

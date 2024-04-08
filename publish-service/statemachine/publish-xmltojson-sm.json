@@ -1,0 +1,86 @@
+{
+    "Comment": "uploading zip files with xml data and converting them to json and saving in s3 bucket",
+    "StartAt": "getZipFoldersFromS3",
+    "States": {
+        "getZipFoldersFromS3": {
+            "Type": "Task",
+            "Next": "Fanout",
+            "Parameters": {
+                "FunctionName": "${publishGetS3ZipLambdaArn}",
+                "Payload.$": "$"
+            },
+            "Resource": "${publishGetS3ZipLambdaArn}",
+            "Retry": [
+                {
+                    "BackoffRate": 2,
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException",
+                        "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3
+                }
+            ],
+            "OutputPath": "$"
+        },
+        "Fanout": {
+            "Type": "Map",
+            "MaxConcurrency": 25,
+            "Next": "uploadJsonToS3",
+            "ItemsPath": "$",
+            "Iterator": {
+                "StartAt": "unzipAndExtractXmlFilesAndConvertToJSON",
+                "States": {
+                    "unzipAndExtractXmlFilesAndConvertToJSON": {
+                        "Type": "Task",
+                        "Parameters": {
+                            "FunctionName": "${publishXmlToJsonConvertorLambdaArn}",
+                            "Payload.$": "$"
+                        },
+                        "Resource": "${publishXmlToJsonConvertorLambdaArn}",
+                        "End": true,
+                        "Retry": [
+                            {
+                                "BackoffRate": 2,
+                                "ErrorEquals": [
+                                    "Lambda.ServiceException",
+                                    "Lambda.AWSLambdaException",
+                                    "Lambda.SdkClientException",
+                                    "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 1,
+                                "MaxAttempts": 3
+                            }
+                        ]
+                    }
+                }
+            },
+            "ResultPath": "$"
+        },
+        "uploadJsonToS3": {
+            "Type": "Task",
+            "Parameters": {
+                "FunctionName": "${publishUploadJsonToS3LambdaArn}",
+                "Payload.$": "$"
+            },
+            "Resource": "${publishUploadJsonToS3LambdaArn}",
+            "Retry": [
+                {
+                    "BackoffRate": 2,
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException",
+                        "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3
+                }
+            ],
+            "OutputPath": "$",
+            "End": true
+        }
+    }
+}

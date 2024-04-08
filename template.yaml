@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  publish-app
+
+  Sample SAM Template for publish-app
+
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  NamePrefix:
+    Description: Prefix added to the name of resources created in this stack (must be the same as the one of the pipeline)
+    Type: String
+
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 1024
+    Environment:
+      Variables:
+        INPUT_BUCKET: !Sub publish-upload-eu-central-1-452010797180
+        STEP_FUNCTION_ARN: !Sub arn:aws:states:eu-central-1:452010797180:stateMachine:publish-xmltojson-statemachine
+
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+
+  PublishUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: publish-upload-eu-central-1-452010797180
+
+  publishXmlToJsonFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: publish-service/
+      Handler: dist/handlers/publish-xmltojson-request.publishXmlToJsonHandler
+      Runtime: nodejs20.x
+      Policies:
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !Sub 'publish-xmltojson-statemachine'
+      Architectures:
+        - x86_64
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: PublishUploadBucket     # This must be the name of an S3 bucket declared in the same template file
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                - Name: prefix      # or "suffix"
+                  Value: manual_upload_zip_files/      # The value to search for in the S3 object key names
+
+
+  publishGetS3ZipFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: publish-service/
+      Handler: dist/handlers/publish-getS3Zip-request.publishGetS3ZipHandler
+      Runtime: nodejs20.x
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Sub 'publish-upload-eu-central-1-452010797180'
+        - S3ReadPolicy:
+            BucketName: !Sub 'publish-upload-eu-central-1-452010797180'
+      Architectures:
+        - x86_64
+
+  publishXmlToJsonConvertorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: publish-service/
+      Handler: dist/handlers/publish-xmltojson-convertor-request.publishXmlToJsonConvertorHandler
+      Runtime: nodejs20.x
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Sub 'publish-upload-eu-central-1-452010797180'
+        - S3ReadPolicy:
+            BucketName: !Sub 'publish-upload-eu-central-1-452010797180'
+      Architectures:
+        - x86_64
+
+  publishUploadJsonToS3Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: publish-service/
+      Handler: dist/handlers/publish-uploadJsonToS3-request.publishUploadJsonToS3Handler
+      Runtime: nodejs20.x
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Sub 'publish-upload-eu-central-1-452010797180'
+        - S3ReadPolicy:
+            BucketName: !Sub 'publish-upload-eu-central-1-452010797180'
+      Architectures:
+        - x86_64
+
+  publishZipFilesWithXmlToJsonStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: publish-service/statemachine/publish-xmltojson-sm.json
+      Name: !Sub 'publish-xmltojson-statemachine'
+      DefinitionSubstitutions:
+        publishGetS3ZipLambdaArn : !GetAtt publishGetS3ZipFunction.Arn      
+        publishXmlToJsonConvertorLambdaArn: !GetAtt publishXmlToJsonConvertorFunction.Arn
+        publishUploadJsonToS3LambdaArn: !GetAtt publishUploadJsonToS3Function.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref publishGetS3ZipFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref publishXmlToJsonConvertorFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref publishUploadJsonToS3Function
